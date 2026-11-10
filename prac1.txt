@@ -1,0 +1,69 @@
+
+#!/bin/bash
+
+file="addressbook.txt"
+
+while true
+do
+    echo "=== ADDRESS BOOK ==="
+    echo "1) Create address book"
+    echo "2) View address book"
+    echo "3) Insert record"
+    echo "4) Delete record"
+    echo "5) Modify record"
+    echo "6) Exit"
+    echo "Enter your choice:"
+    read ch
+
+    case $ch in
+
+    1)
+        touch "$file"
+        echo "Address book created"
+        ;;
+
+    2)
+        if [ ! -s "$file" ]; then
+            echo "Address book is empty"
+        else
+            cat "$file"
+        fi
+        ;;
+
+    3)
+        echo "Enter name,surname,email,mobile:"
+        read record
+        echo "$record" >> "$file"
+        echo "Record inserted"
+        ;;
+
+    4)
+        echo "Enter name to delete:"
+        read name
+        grep -vi "^${name}," "$file" > temp.txt
+        mv temp.txt "$file"
+        echo "Record deleted"
+        ;;
+
+    5)
+        echo "Enter name to modify:"
+        read name
+        grep -vi "^${name}," "$file" > temp.txt
+        echo "Enter new name,surname,email,mobile:"
+        read record
+        echo "$record" >> temp.txt
+        mv temp.txt "$file"
+        echo "Record modified"
+        ;;
+
+    6)
+        echo "Exit program"
+        break
+        ;;
+
+    *)
+        echo "Invalid choice"
+        ;;
+
+    esac
+done

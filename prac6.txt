@@ -1,0 +1,142 @@
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+
+#define FIFO1 "/tmp/fifo1"
+#define FIFO2 "/tmp/fifo2"
+#define SIZE 1024
+
+void process1()
+{
+    int fd_write, fd_read;
+    char input[SIZE] = "";
+    char temp[SIZE];
+    char output[SIZE] = "";
+
+    printf("Enter sentences (Ctrl+D to finish):\n");
+
+    while(fgets(temp, sizeof(temp), stdin) != NULL)
+    {
+        if(strlen(input) + strlen(temp) >= SIZE)
+        {
+            printf("Input limit reached\n");
+            break;
+        }
+
+        strcat(input, temp);
+    }
+
+    fd_write = open(FIFO1, O_WRONLY);
+    write(fd_write, input, strlen(input) + 1);
+    close(fd_write);
+
+    fd_read = open(FIFO2, O_RDONLY);
+    read(fd_read, output, SIZE);
+    close(fd_read);
+
+    printf("\nResults from Process 2:\n%s", output);
+}
+
+void process2()
+{
+    int fd_read, fd_write;
+    char buffer[SIZE] = "";
+    char result[SIZE];
+    int characters = 0, words = 0, lines = 0;
+    int i = 0, in_word = 0;
+    FILE *fp;
+
+    fd_read = open(FIFO1, O_RDONLY);
+    read(fd_read, buffer, SIZE);
+    close(fd_read);
+
+    while(buffer[i] != '\0')
+    {
+        characters++;
+
+        if(buffer[i] == '\n')
+            lines++;
+
+        if(buffer[i] == ' ' || buffer[i] == '\t' || buffer[i] == '\n')
+            in_word = 0;
+        else if(in_word == 0)
+        {
+            words++;
+            in_word = 1;
+        }
+
+        i++;
+    }
+
+    if(characters > 0 && buffer[i-1] != '\n')
+        lines++;
+
+    fp = fopen("output.txt", "w");
+
+    if(fp == NULL)
+    {
+        perror("File error");
+        exit(1);
+    }
+
+    fprintf(fp, "Character count: %d\n", characters);
+    fprintf(fp, "Word count: %d\n", words);
+    fprintf(fp, "Line count: %d\n", lines);
+
+    fclose(fp);
+
+    fp = fopen("output.txt", "r");
+
+    if(fp == NULL)
+    {
+        perror("File error");
+        exit(1);
+    }
+
+    fread(result, 1, SIZE-1, fp);
+    fclose(fp);
+
+    result[SIZE-1] = '\0';
+
+    fd_write = open(FIFO2, O_WRONLY);
+    write(fd_write, result, strlen(result) + 1);
+    close(fd_write);
+}
+
+int main()
+{
+    pid_t pid;
+
+    mkfifo(FIFO1, 0666);
+    mkfifo(FIFO2, 0666);
+
+    pid = fork();
+
+    if(pid < 0)
+    {
+        printf("Fork failed\n");
+        return 1;
+    }
+
+    if(pid > 0)
+    {
+        process1();
+        wait(NULL);
+    }
+    else
+    {
+        process2();
+        exit(0);
+    }
+
+    unlink(FIFO1);
+    unlink(FIFO2);
+
+    return 0;
+}
